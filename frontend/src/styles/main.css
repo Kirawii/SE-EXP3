@@ -1,0 +1,64 @@
+:root {
+  --layout-max: 1200px;
+  --header-h: 56px;
+  --bg-soft: #f5f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    sans-serif;
+  color: #1f2329;
+  background: var(--bg-soft);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: var(--layout-max);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.page--full {
+  flex: 1;
+  width: 100%;
+  display: flex;
+}
+
+.card-shadow {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.muted {
+  color: #909399;
+}
+
+/* leaflet 默认 marker 在 vite 构建里会丢图标,这里用 css 兜底 */
+.leaflet-default-icon-path {
+  background-image: url('https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png');
+}

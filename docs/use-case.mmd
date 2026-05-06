@@ -1,0 +1,104 @@
+%%{ init: { "theme": "neutral", "flowchart": { "curve": "basis", "padding": 8 } } }%%
+flowchart LR
+
+  classDef actor fill:#fff,stroke:#333,stroke-width:1.4px,color:#222
+  classDef external fill:#f0f1f4,stroke:#666,stroke-width:1px,stroke-dasharray:4 3,color:#333
+  classDef uc fill:#fbfbfb,stroke:#444,stroke-width:1px,color:#222,rx:24,ry:24
+  classDef pkg fill:#f4f6f9,stroke:#888,stroke-width:1px,color:#333
+
+  Guest((游客)):::actor
+  User((注册用户)):::actor
+  Admin((管理员)):::actor
+  Redis[/Redis GEO/]:::external
+  Map[/地图瓦片服务/]:::external
+
+  User -. 继承 .-> Guest
+  Admin -. 继承 .-> User
+
+  subgraph SYS [地标管理原型系统]
+    direction TB
+
+    subgraph A [账户]
+      direction LR
+      REG([注册]):::uc
+      LOGIN([登录]):::uc
+      LOGOUT([登出]):::uc
+      PROFILE([修改资料]):::uc
+    end
+
+    subgraph B [地标管理]
+      direction LR
+      LIST([浏览地标列表]):::uc
+      DETAIL([查看地标详情]):::uc
+      CREATE([创建地标]):::uc
+      EDIT([编辑地标]):::uc
+      DELETE([删除地标]):::uc
+      IMPORT([批量导入]):::uc
+      PICK([在地图上选点]):::uc
+    end
+
+    subgraph C [地理查询 GEO]
+      direction LR
+      NEARBY([附近地标查询]):::uc
+      DIST([两点距离计算]):::uc
+      BOX([矩形区域查询]):::uc
+      HASH([获取 Geohash]):::uc
+    end
+
+    subgraph D [互动]
+      direction LR
+      FAV([收藏地标]):::uc
+      COMMENT([评论地标]):::uc
+    end
+
+    subgraph E [后台管理]
+      direction LR
+      REVIEW([审核地标]):::uc
+      USERMGMT([用户管理]):::uc
+      EXPORT([数据导出]):::uc
+    end
+  end
+
+  class A,B,C,D,E pkg
+  class SYS pkg
+
+  Guest --> REG
+  Guest --> LOGIN
+  Guest --> LIST
+  Guest --> DETAIL
+  Guest --> NEARBY
+  Guest --> DIST
+  Guest --> BOX
+
+  User --> LOGOUT
+  User --> PROFILE
+  User --> CREATE
+  User --> EDIT
+  User --> DELETE
+  User --> IMPORT
+  User --> HASH
+  User --> FAV
+  User --> COMMENT
+
+  Admin --> REVIEW
+  Admin --> USERMGMT
+  Admin --> EXPORT
+
+  CREATE -. include .-> PICK
+  EDIT -. include .-> PICK
+  NEARBY -. extend .-> LIST
+  COMMENT -. extend .-> DETAIL
+  REVIEW -. include .-> DETAIL
+
+  CREATE --> Redis
+  EDIT --> Redis
+  DELETE --> Redis
+  IMPORT --> Redis
+  NEARBY --> Redis
+  DIST --> Redis
+  BOX --> Redis
+  HASH --> Redis
+
+  LIST --> Map
+  DETAIL --> Map
+  PICK --> Map

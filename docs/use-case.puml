@@ -1,0 +1,135 @@
+@startuml LandmarkUseCase
+' ============================================================
+' 地标管理原型系统 用例图
+' 软件工程课程设计 · 第 N 组（许桐恺、闫晨曦、肖旭仁、侯躍铖、魏振邦）
+' ============================================================
+
+skinparam dpi 130
+skinparam shadowing false
+skinparam handwritten false
+skinparam defaultFontName "PingFang SC"
+skinparam ArrowColor #4A4A4A
+skinparam ArrowFontSize 11
+
+skinparam usecase {
+  BackgroundColor #FBFBFB
+  BorderColor #4A4A4A
+  FontSize 12
+}
+skinparam actor {
+  BackgroundColor #FFFFFF
+  BorderColor #4A4A4A
+  FontSize 12
+}
+skinparam package {
+  BackgroundColor #F4F6F9
+  BorderColor #888888
+  FontStyle bold
+  FontSize 13
+}
+skinparam rectangle {
+  BorderColor #2C3E50
+  FontStyle bold
+  FontSize 14
+}
+
+left to right direction
+
+' ---------- 主参与者 ----------
+actor 游客      as Guest
+actor "注册用户" as User
+actor 管理员    as Admin
+
+User  --|> Guest
+Admin --|> User
+
+' ---------- 系统边界 ----------
+rectangle "地标管理原型系统" {
+
+  package "账户" {
+    usecase "注册"      as UC_REG
+    usecase "登录"      as UC_LOGIN
+    usecase "登出"      as UC_LOGOUT
+    usecase "修改资料"  as UC_PROFILE
+  }
+
+  package "地标管理" {
+    usecase "浏览地标列表" as UC_LIST
+    usecase "查看地标详情" as UC_DETAIL
+    usecase "创建地标"     as UC_CREATE
+    usecase "编辑地标"     as UC_EDIT
+    usecase "删除地标"     as UC_DELETE
+    usecase "批量导入"     as UC_IMPORT
+    usecase "在地图上选点" as UC_PICK
+  }
+
+  package "地理查询（GEO）" {
+    usecase "附近地标查询"   as UC_NEARBY
+    usecase "两点距离计算"   as UC_DIST
+    usecase "矩形区域查询"   as UC_BOX
+    usecase "获取 Geohash"   as UC_HASH
+  }
+
+  package "互动" {
+    usecase "收藏地标" as UC_FAV
+    usecase "评论地标" as UC_COMMENT
+  }
+
+  package "后台管理" {
+    usecase "审核地标" as UC_REVIEW
+    usecase "用户管理" as UC_USERMGMT
+    usecase "数据导出" as UC_EXPORT
+  }
+}
+
+' ---------- 外部系统 ----------
+actor "Redis GEO"     as Redis  <<外部系统>>
+actor "地图瓦片服务"  as Map    <<外部系统>>
+
+' ---------- 游客可达 ----------
+Guest --> UC_REG
+Guest --> UC_LOGIN
+Guest --> UC_LIST
+Guest --> UC_DETAIL
+Guest --> UC_NEARBY
+Guest --> UC_DIST
+Guest --> UC_BOX
+
+' ---------- 注册用户增量 ----------
+User --> UC_LOGOUT
+User --> UC_PROFILE
+User --> UC_CREATE
+User --> UC_EDIT
+User --> UC_DELETE
+User --> UC_IMPORT
+User --> UC_HASH
+User --> UC_FAV
+User --> UC_COMMENT
+
+' ---------- 管理员增量 ----------
+Admin --> UC_REVIEW
+Admin --> UC_USERMGMT
+Admin --> UC_EXPORT
+
+' ---------- include / extend ----------
+UC_CREATE  ..> UC_PICK   : <<include>>
+UC_EDIT    ..> UC_PICK   : <<include>>
+UC_NEARBY  ..> UC_LIST   : <<extend>>
+UC_COMMENT ..> UC_DETAIL : <<extend>>
+UC_REVIEW  ..> UC_DETAIL : <<include>>
+
+' ---------- 外部系统调用 ----------
+UC_CREATE --> Redis
+UC_EDIT   --> Redis
+UC_DELETE --> Redis
+UC_IMPORT --> Redis
+UC_NEARBY --> Redis
+UC_DIST   --> Redis
+UC_BOX    --> Redis
+UC_HASH   --> Redis
+
+UC_LIST   --> Map
+UC_DETAIL --> Map
+UC_PICK   --> Map
+
+@enduml
