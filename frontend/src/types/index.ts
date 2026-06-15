@@ -1,17 +1,18 @@
 export interface User {
   id: string;
   username: string;
-  email: string;
+  email: string | null;
   nickname: string | null;
-  avatar_url: string | null;
+  avatar: string | null;
   role: string;
+  disabled?: boolean;
   created_at: string;
 }
 
 export interface TokenOut {
   access_token: string;
   token_type: 'bearer';
-  expires_in: number;
+  expires_at: string;
   user: User;
 }
 
@@ -55,6 +56,21 @@ export interface DistanceOut {
   a_id: string;
   b_id: string;
   distance_km: number;
+}
+
+export interface FavoriteState {
+  landmark_id: string;
+  favorited: boolean;
+  count: number;
+}
+
+export interface Comment {
+  id: string;
+  landmark_id: string;
+  user_id: string;
+  username: string;
+  content: string;
+  created_at: string;
 }
 
 export interface ApiError {

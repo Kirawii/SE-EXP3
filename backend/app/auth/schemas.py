@@ -31,15 +31,18 @@ class LoginIn(BaseModel):
     password: str
 
 
-class TokenOut(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_at: str
-
-
 class UserOut(BaseModel):
     id: str
     username: str
     email: EmailStr
     role: str
+    nickname: str | None = None
+    avatar: str | None = None
     created_at: str
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_at: str
+    user: UserOut

@@ -1,6 +1,15 @@
 import client from './client';
 import type { Landmark, LandmarkCreateIn, LandmarkUpdateIn } from '@/types';
 
+export interface SearchParams {
+  q?: string;
+  category?: string;
+  limit?: number;
+}
+
+export const searchLandmarks = (params: SearchParams = {}) =>
+  client.get<Landmark[]>('/landmarks', { params }).then((r) => r.data);
+
 export const createLandmark = (payload: LandmarkCreateIn) =>
   client.post<Landmark>('/landmarks', payload).then((r) => r.data);
 

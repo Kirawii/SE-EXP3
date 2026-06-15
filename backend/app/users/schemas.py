@@ -13,4 +13,5 @@ class UserPublicOut(BaseModel):
     role: str
     nickname: str | None = None
     avatar: str | None = None
+    disabled: bool = False
     created_at: str

@@ -5,9 +5,10 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import * as landmarkApi from '@/api/landmarks';
 import * as geoApi from '@/api/geo';
+import * as socialApi from '@/api/social';
 import { useAuthStore } from '@/stores/auth';
 import LandmarkForm from '@/components/LandmarkForm.vue';
-import type { Landmark, LandmarkCreateIn } from '@/types';
+import type { Comment, Landmark, LandmarkCreateIn } from '@/types';
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -18,6 +19,66 @@ const loading = ref(false);
 const geohash = ref<string>('');
 
 const isOwner = computed(() => !!landmark.value && landmark.value.owner_id === auth.user?.id);
+
+// 收藏
+const favorited = ref(false);
+const favCount = ref(0);
+const favBusy = ref(false);
+
+async function loadFavorite() {
+  const s = await socialApi.getFavoriteState(props.id);
+  favorited.value = s.favorited;
+  favCount.value = s.count;
+}
+
+async function toggleFavorite() {
+  if (!auth.isAuthed) {
+    router.push({ name: 'login', query: { redirect: `/landmarks/${props.id}` } });
+    return;
+  }
+  favBusy.value = true;
+  try {
+    const s = favorited.value
+      ? await socialApi.removeFavorite(props.id)
+      : await socialApi.addFavorite(props.id);
+    favorited.value = s.favorited;
+    favCount.value = s.count;
+  } finally {
+    favBusy.value = false;
+  }
+}
+
+// 评论
+const comments = ref<Comment[]>([]);
+const commentInput = ref('');
+const commentBusy = ref(false);
+
+async function loadComments() {
+  comments.value = await socialApi.listComments(props.id);
+}
+
+async function submitComment() {
+  const text = commentInput.value.trim();
+  if (!text) return;
+  commentBusy.value = true;
+  try {
+    await socialApi.addComment(props.id, text);
+    commentInput.value = '';
+    await loadComments();
+    ElMessage.success('评论已发表');
+  } finally {
+    commentBusy.value = false;
+  }
+}
+
+async function removeComment(c: Comment) {
+  await socialApi.deleteComment(c.id);
+  await loadComments();
+}
+
+function canDeleteComment(c: Comment): boolean {
+  return c.user_id === auth.user?.id || auth.isAdmin;
+}
 
 const editing = ref(false);
 const submitting = ref(false);
@@ -40,6 +101,8 @@ async function load() {
     const [lm, hash] = await Promise.all([
       landmarkApi.getLandmark(props.id),
       geoApi.geohash(props.id).catch(() => ({ id: props.id, geohash: '' })),
+      loadFavorite().catch(() => {}),
+      loadComments().catch(() => {}),
     ]);
     landmark.value = lm;
     geohash.value = hash.geohash;
@@ -126,9 +189,18 @@ onBeforeUnmount(() => {
             <span v-if="geohash" class="muted">Geohash {{ geohash }}</span>
           </div>
         </div>
-        <div v-if="isOwner" class="actions">
-          <el-button @click="startEdit">编辑</el-button>
-          <el-button type="danger" @click="onDelete">删除</el-button>
+        <div class="actions">
+          <el-button
+            :type="favorited ? 'warning' : 'default'"
+            :loading="favBusy"
+            @click="toggleFavorite"
+          >
+            {{ favorited ? '★ 已收藏' : '☆ 收藏' }} · {{ favCount }}
+          </el-button>
+          <template v-if="isOwner">
+            <el-button @click="startEdit">编辑</el-button>
+            <el-button type="danger" @click="onDelete">删除</el-button>
+          </template>
         </div>
       </div>
 
@@ -148,6 +220,47 @@ onBeforeUnmount(() => {
           </dl>
         </div>
         <div ref="mapEl" class="map card-shadow"></div>
+      </div>
+
+      <div class="card-shadow comments">
+        <h3>评论 ({{ comments.length }})</h3>
+        <div v-if="auth.isAuthed" class="comment-editor">
+          <el-input
+            v-model="commentInput"
+            type="textarea"
+            :rows="2"
+            maxlength="500"
+            show-word-limit
+            placeholder="说点什么..."
+          />
+          <el-button type="primary" :loading="commentBusy" @click="submitComment">发表</el-button>
+        </div>
+        <p v-else class="muted">
+          <router-link :to="{ name: 'login', query: { redirect: `/landmarks/${id}` } }" class="link">
+            登录
+          </router-link>
+          后参与评论
+        </p>
+
+        <el-empty v-if="!comments.length" description="还没有评论" :image-size="80" />
+        <ul v-else class="comment-list">
+          <li v-for="c in comments" :key="c.id" class="comment-item">
+            <div class="c-head">
+              <span class="c-user">{{ c.username }}</span>
+              <span class="muted c-time">{{ new Date(Number(c.created_at) * 1000).toLocaleString('zh-CN') }}</span>
+              <el-button
+                v-if="canDeleteComment(c)"
+                size="small"
+                link
+                type="danger"
+                @click="removeComment(c)"
+              >
+                删除
+              </el-button>
+            </div>
+            <div class="c-body">{{ c.content }}</div>
+          </li>
+        </ul>
       </div>
     </template>
 
@@ -221,6 +334,53 @@ onBeforeUnmount(() => {
 }
 .map {
   min-height: 400px;
+}
+.comments {
+  margin-top: 16px;
+  padding: 20px;
+}
+.comments h3 {
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+.comment-editor {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+.comment-editor .el-textarea {
+  flex: 1;
+}
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.comment-item {
+  padding: 12px 0;
+  border-top: 1px solid #f0f2f5;
+}
+.c-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.c-user {
+  font-weight: 600;
+  font-size: 14px;
+}
+.c-time {
+  font-size: 12px;
+}
+.c-body {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.link {
+  color: #409eff;
 }
 @media (max-width: 720px) {
   .grid {

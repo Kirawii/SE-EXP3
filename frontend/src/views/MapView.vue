@@ -29,9 +29,17 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const mapEl = ref<HTMLDivElement>();
+const queryMode = ref<'radius' | 'box'>('radius');
 const radiusKm = ref(20);
+const widthKm = ref(30);
+const heightKm = ref(30);
 const hits = ref<NearbyHit[]>([]);
 const loading = ref(false);
+
+// 距离测量(GEODIST)
+const distA = ref<string>('');
+const distB = ref<string>('');
+const distResult = ref<number | null>(null);
 
 const dialogOpen = ref(false);
 const submitting = ref(false);
@@ -56,17 +64,40 @@ async function refresh() {
   const center = map.getCenter();
   loading.value = true;
   try {
-    const list = await geoApi.nearby({
-      lng: center.lng,
-      lat: center.lat,
-      radius_km: Math.min(radiusKm.value, 50),
-      limit: 200,
-    });
+    const list =
+      queryMode.value === 'radius'
+        ? await geoApi.nearby({
+            lng: center.lng,
+            lat: center.lat,
+            radius_km: Math.min(radiusKm.value, 50),
+            limit: 200,
+          })
+        : await geoApi.box({
+            lng: center.lng,
+            lat: center.lat,
+            width_km: Math.min(widthKm.value, 200),
+            height_km: Math.min(heightKm.value, 200),
+            limit: 200,
+          });
     hits.value = list;
     drawMarkers(list);
+    // 清掉已不在结果集中的距离测量选择
+    const ids = new Set(list.map((h) => h.id));
+    if (distA.value && !ids.has(distA.value)) distA.value = '';
+    if (distB.value && !ids.has(distB.value)) distB.value = '';
+    distResult.value = null;
   } finally {
     loading.value = false;
   }
+}
+
+async function computeDistance() {
+  if (!distA.value || !distB.value || distA.value === distB.value) {
+    ElMessage.warning('请选择两个不同的地标');
+    return;
+  }
+  const res = await geoApi.distance(distA.value, distB.value);
+  distResult.value = res.distance_km;
 }
 
 function drawMarkers(list: NearbyHit[]) {
@@ -155,27 +186,55 @@ onBeforeUnmount(() => {
   <div class="map-view">
     <div class="toolbar">
       <div class="left">
-        <span class="muted">半径</span>
-        <el-input-number
-          v-model="radiusKm"
-          :min="1"
-          :max="50"
-          :step="1"
-          size="small"
-          style="width: 110px"
-          @change="refresh"
-        />
-        <span class="muted">km · 共 {{ hits.length }} 个地标</span>
+        <el-radio-group v-model="queryMode" size="small" @change="refresh">
+          <el-radio-button value="radius">圆形</el-radio-button>
+          <el-radio-button value="box">矩形</el-radio-button>
+        </el-radio-group>
+
+        <template v-if="queryMode === 'radius'">
+          <span class="muted">半径</span>
+          <el-input-number
+            v-model="radiusKm"
+            :min="1"
+            :max="50"
+            :step="1"
+            size="small"
+            style="width: 110px"
+            @change="refresh"
+          />
+          <span class="muted">km</span>
+        </template>
+        <template v-else>
+          <span class="muted">宽</span>
+          <el-input-number v-model="widthKm" :min="1" :max="200" size="small" style="width: 100px" @change="refresh" />
+          <span class="muted">高</span>
+          <el-input-number v-model="heightKm" :min="1" :max="200" size="small" style="width: 100px" @change="refresh" />
+          <span class="muted">km</span>
+        </template>
+
+        <span class="muted">· 共 {{ hits.length }} 个地标</span>
       </div>
       <div class="right">
-        <el-button :icon="undefined" :loading="loading" size="small" @click="refresh">
-          刷新
-        </el-button>
+        <el-button :loading="loading" size="small" @click="refresh">刷新</el-button>
         <el-button type="primary" size="small" @click="openCreate">
           在视图中心创建地标
         </el-button>
       </div>
     </div>
+
+    <div class="dist-bar">
+      <span class="muted">距离测量(GEODIST):</span>
+      <el-select v-model="distA" placeholder="地标 A" size="small" filterable style="width: 160px">
+        <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
+      </el-select>
+      <span class="muted">→</span>
+      <el-select v-model="distB" placeholder="地标 B" size="small" filterable style="width: 160px">
+        <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
+      </el-select>
+      <el-button size="small" @click="computeDistance">计算</el-button>
+      <el-tag v-if="distResult !== null" type="success">{{ distResult.toFixed(3) }} km</el-tag>
+    </div>
+
     <div ref="mapEl" class="map"></div>
 
     <el-dialog v-model="dialogOpen" title="创建地标" width="520px">
@@ -209,10 +268,20 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+}
+.dist-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 24px;
+  background: #fafbfc;
+  border-bottom: 1px solid #ebeef5;
+  flex-wrap: wrap;
 }
 .map {
   flex: 1;
   width: 100%;
-  min-height: calc(100vh - var(--header-h) - 48px);
+  min-height: calc(100vh - var(--header-h) - 96px);
 }
 </style>

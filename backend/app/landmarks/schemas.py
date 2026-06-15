@@ -36,3 +36,4 @@ class LandmarkOut(BaseModel):
     lng: float
     lat: float
     created_at: str
+    updated_at: str = ""

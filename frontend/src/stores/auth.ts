@@ -11,6 +11,7 @@ export const useAuthStore = defineStore(
     const user = ref<User | null>(null);
 
     const isAuthed = computed(() => !!token.value);
+    const isAdmin = computed(() => user.value?.role === 'ADMIN');
 
     async function login(payload: LoginPayload) {
       const res = await authApi.login(payload);
@@ -45,7 +46,7 @@ export const useAuthStore = defineStore(
       if (stored && !token.value) token.value = stored;
     }
 
-    return { token, user, isAuthed, login, register, logout, fetchMe, hydrate };
+    return { token, user, isAuthed, isAdmin, login, register, logout, fetchMe, hydrate };
   },
   {
     persist: {

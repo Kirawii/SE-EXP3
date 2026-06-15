@@ -19,6 +19,7 @@ def _to_out(d: dict) -> dict:
         "lng": float(d["lng"]),
         "lat": float(d["lat"]),
         "created_at": d.get("created_at", ""),
+        "updated_at": d.get("updated_at", d.get("created_at", "")),
     }
 
 
@@ -53,6 +54,7 @@ async def create_landmark(
         "lng": str(lng),
         "lat": str(lat),
         "created_at": now,
+        "updated_at": now,
     }
 
     pipe = r.pipeline()
@@ -120,6 +122,7 @@ async def update_landmark(
         if key in fields:
             new_data[key] = fields[key] if fields[key] is not None else ""
 
+    new_data["updated_at"] = str(int(time.time()))
     pipe.hset(
         K.landmark(lid),
         mapping={
@@ -130,6 +133,7 @@ async def update_landmark(
             "lng": new_data["lng"],
             "lat": new_data["lat"],
             "status": new_data.get("status", "APPROVED"),
+            "updated_at": new_data["updated_at"],
         },
     )
     await pipe.execute()
@@ -166,6 +170,29 @@ async def list_by_category(cat: str) -> list[dict]:
 
 async def list_by_status(status: str) -> list[dict]:
     return await _hydrate_set(K.landmark_by_status(status))
+
+
+async def search_landmarks(
+    *, q: str | None = None, category: str | None = None, status: str = "APPROVED", limit: int = 100
+) -> list[dict]:
+    """按状态/类别取候选集合，再在应用层按名称关键字过滤。原型规模下足够。"""
+    if category:
+        base = K.landmark_by_category(category)
+    else:
+        base = K.landmark_by_status(status)
+
+    ids = list(await redis().smembers(base))
+    rows = await hydrate_many(ids)
+
+    # 指定类别时仍需用状态二次过滤（类别集合含各种状态）
+    if category:
+        rows = [r for r in rows if r["status"] == status]
+    if q:
+        kw = q.strip().lower()
+        rows = [r for r in rows if kw in r["name"].lower()]
+
+    rows.sort(key=lambda r: r["created_at"], reverse=True)
+    return rows[:limit]
 
 
 async def hydrate_many(ids: list[str]) -> list[dict]:

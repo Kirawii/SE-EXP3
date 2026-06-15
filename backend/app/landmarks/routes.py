@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
 
 from ..deps import get_current_user
 from .repository import (
@@ -7,12 +9,23 @@ from .repository import (
     get_landmark,
     list_by_category,
     list_by_owner,
+    search_landmarks,
     update_landmark,
 )
 from .schemas import LandmarkCreateIn, LandmarkOut, LandmarkUpdateIn
 
 
 router = APIRouter()
+
+
+@router.get("", response_model=list[LandmarkOut])
+async def search(
+    q: Annotated[str | None, Query(max_length=80)] = None,
+    category: Annotated[str | None, Query(max_length=30)] = None,
+    limit: Annotated[int, Query(gt=0, le=500)] = 100,
+) -> list[dict]:
+    """公开检索：按名称关键字 + 类别筛选已审核地标。"""
+    return await search_landmarks(q=q, category=category, status="APPROVED", limit=limit)
 
 
 @router.post("", response_model=LandmarkOut, status_code=201)

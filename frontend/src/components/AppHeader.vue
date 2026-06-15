@@ -19,11 +19,17 @@ async function onLogout() {
       <router-link to="/map" class="brand">地标管理原型</router-link>
       <nav class="nav">
         <router-link to="/map">地图</router-link>
-        <router-link to="/landmarks">我的地标</router-link>
+        <router-link to="/explore">探索</router-link>
+        <router-link v-if="auth.isAuthed" to="/landmarks">我的地标</router-link>
+        <router-link v-if="auth.isAuthed" to="/favorites">我的收藏</router-link>
+        <router-link v-if="auth.isAdmin" to="/admin">管理后台</router-link>
       </nav>
       <div class="account">
         <template v-if="auth.isAuthed">
-          <span class="username">{{ auth.user?.nickname || auth.user?.username }}</span>
+          <router-link to="/profile" class="username">
+            {{ auth.user?.nickname || auth.user?.username }}
+            <el-tag v-if="auth.isAdmin" size="small" type="danger" effect="plain">管理员</el-tag>
+          </router-link>
           <el-button size="small" link @click="onLogout">登出</el-button>
         </template>
         <template v-else>
@@ -86,5 +92,8 @@ async function onLogout() {
 .username {
   font-weight: 500;
   color: #1f2329;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>

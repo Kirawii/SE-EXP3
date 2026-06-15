@@ -23,5 +23,5 @@ export const logout = () => client.post<void>('/auth/logout').then((r) => r.data
 
 export const me = () => client.get<User>('/users/me').then((r) => r.data);
 
-export const updateMe = (payload: Partial<Pick<User, 'nickname' | 'avatar_url'>>) =>
+export const updateMe = (payload: Partial<Pick<User, 'nickname' | 'avatar'>>) =>
   client.patch<User>('/users/me', payload).then((r) => r.data);

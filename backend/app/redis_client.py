@@ -39,6 +39,7 @@ class K:
 
     SEQ_USER = "seq:users"
     SEQ_LANDMARK = "seq:landmarks"
+    SEQ_COMMENT = "seq:comments"
 
     @staticmethod
     def user(uid: str) -> str:
@@ -79,3 +80,24 @@ class K:
     @staticmethod
     def landmark_by_category(cat: str) -> str:
         return f"landmarks:by_category:{cat}"
+
+    # ---- 社交：收藏与评论 ----
+
+    @staticmethod
+    def fav_by_user(uid: str) -> str:
+        """用户收藏的地标集合。"""
+        return f"favorites:by_user:{uid}"
+
+    @staticmethod
+    def fav_by_landmark(lid: str) -> str:
+        """收藏某地标的用户集合，用于计数。"""
+        return f"favorites:by_landmark:{lid}"
+
+    @staticmethod
+    def comment(cid: str) -> str:
+        return f"comments:{cid}"
+
+    @staticmethod
+    def comments_of(lid: str) -> str:
+        """地标下的评论：Sorted Set，member=cid，score=created_at。"""
+        return f"comments:by_landmark:{lid}"

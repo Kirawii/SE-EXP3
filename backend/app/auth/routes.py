@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from ..config import get_settings
 from ..deps import client_ip, get_current_payload
-from ..errors import InvalidCredentials, NotFound, TooManyRequests
+from ..errors import Forbidden, InvalidCredentials, NotFound, TooManyRequests
 from ..redis_client import K, redis
 from ..security import hash_password, issue_token, verify_password
 from ..users.repository import create_user, get_user_by_username
@@ -42,9 +42,23 @@ async def login(payload: LoginIn, request: Request) -> TokenOut:
         raise InvalidCredentials("用户名或密码错误")
     if not verify_password(payload.password, user.get("password_hash", "")):
         raise InvalidCredentials("用户名或密码错误")
+    if user.get("disabled") == "1":
+        raise Forbidden("账号已被禁用，请联系管理员")
 
     token, _, exp = issue_token(user["id"], user.get("role", "USER"))
-    return TokenOut(access_token=token, expires_at=exp.isoformat())
+    return TokenOut(
+        access_token=token,
+        expires_at=exp.isoformat(),
+        user=UserOut(
+            id=user["id"],
+            username=user["username"],
+            email=user["email"],
+            role=user.get("role", "USER"),
+            nickname=user.get("nickname") or None,
+            avatar=user.get("avatar") or None,
+            created_at=user.get("created_at", ""),
+        ),
+    )
 
 
 @router.post("/logout", status_code=204)

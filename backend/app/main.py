@@ -3,12 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .admin.routes import router as admin_router
 from .auth.routes import router as auth_router
 from .config import get_settings
 from .errors import DomainError, domain_error_handler
 from .geo.routes import router as geo_router
 from .landmarks.routes import router as landmarks_router
 from .redis_client import close_redis, init_redis, redis
+from .social.routes import router as social_router
 from .users.routes import router as users_router
 
 
@@ -40,6 +42,8 @@ def create_app() -> FastAPI:
     app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
     app.include_router(landmarks_router, prefix="/api/v1/landmarks", tags=["landmarks"])
     app.include_router(geo_router, prefix="/api/v1/geo", tags=["geo"])
+    app.include_router(social_router, prefix="/api/v1", tags=["social"])
+    app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict:

@@ -43,6 +43,21 @@ async def get_current_user_id(user: dict = Depends(get_current_user)) -> str:
     return user["id"]
 
 
+async def get_optional_user_id(authorization: str | None = Header(default=None)) -> str | None:
+    """可选鉴权：带合法 Token 返回 uid，否则返回 None，不抛错。用于公开但需识别身份的接口。"""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        payload = decode_token(token)
+    except _jwt.PyJWTError:
+        return None
+    jti = payload.get("jti")
+    if not jti or await redis().exists(K.auth_revoked(jti)):
+        return None
+    return payload.get("sub")
+
+
 def require_role(*roles: str):
     async def checker(user: dict = Depends(get_current_user)) -> dict:
         if user["role"] not in roles:
