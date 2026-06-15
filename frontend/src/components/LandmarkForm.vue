@@ -52,7 +52,7 @@ defineExpose({ submit: onSubmit });
 </script>
 
 <template>
-  <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="onSubmit">
+  <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
     <el-form-item label="名称" prop="name">
       <el-input v-model="form.name" maxlength="64" show-word-limit />
     </el-form-item>
@@ -67,13 +67,29 @@ defineExpose({ submit: onSubmit });
     </el-form-item>
     <div class="coord-row">
       <el-form-item label="经度" prop="lng">
-        <el-input-number v-model="form.lng" :min="-180" :max="180" :step="0.001" :precision="6" />
+        <el-input-number
+          v-model="form.lng"
+          :min="-180"
+          :max="180"
+          :step="0.000001"
+          :precision="6"
+          controls-position="right"
+          style="width: 100%"
+        />
       </el-form-item>
       <el-form-item label="纬度" prop="lat">
-        <el-input-number v-model="form.lat" :min="-85.05" :max="85.05" :step="0.001" :precision="6" />
+        <el-input-number
+          v-model="form.lat"
+          :min="-85.05"
+          :max="85.05"
+          :step="0.000001"
+          :precision="6"
+          controls-position="right"
+          style="width: 100%"
+        />
       </el-form-item>
     </div>
-    <el-button type="primary" native-type="submit" :loading="loading" class="submit">
+    <el-button type="primary" :loading="loading" class="submit" @click="onSubmit">
       {{ submitText || '保存' }}
     </el-button>
   </el-form>
