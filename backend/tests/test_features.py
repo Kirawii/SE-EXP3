@@ -117,6 +117,42 @@ async def test_comment_flow(client):
     assert r.json() == []
 
 
+async def test_recommend_ranks_by_distance_and_popularity(client):
+    await _register(client, "alice")
+    await _register(client, "bob")
+    ha, _ = await _auth_header(client, "alice")
+    hb, _ = await _auth_header(client, "bob")
+
+    # 近的（天安门附近）与稍远但热门的（颐和园被收藏）
+    near = await _make_landmark(client, ha, name="近店", category="shop", lng=116.398, lat=39.909)
+    pop = await _make_landmark(client, ha, name="热门店", category="shop", lng=116.360, lat=39.940)
+
+    # 给“热门店”刷收藏
+    await client.put(f"/api/v1/landmarks/{pop['id']}/favorite", headers=ha)
+    await client.put(f"/api/v1/landmarks/{pop['id']}/favorite", headers=hb)
+
+    r = await client.get(
+        "/api/v1/geo/recommend",
+        params={"lng": 116.397, "lat": 39.908, "radius_km": 10},
+    )
+    assert r.status_code == 200
+    hits = r.json()
+    ids = {h["id"] for h in hits}
+    assert {near["id"], pop["id"]} <= ids
+    # 每条都带 popularity 与 score，且按 score 降序
+    scores = [h["score"] for h in hits]
+    assert scores == sorted(scores, reverse=True)
+    pop_hit = next(h for h in hits if h["id"] == pop["id"])
+    assert pop_hit["popularity"] == 2
+
+    # 类别过滤
+    r = await client.get(
+        "/api/v1/geo/recommend",
+        params={"lng": 116.397, "lat": 39.908, "radius_km": 10, "category": "shop"},
+    )
+    assert all(h["category"] == "shop" for h in r.json())
+
+
 async def test_admin_review_pending(client, monkeypatch):
     # 关闭自动审核，让新地标进入 PENDING
     from app.config import get_settings

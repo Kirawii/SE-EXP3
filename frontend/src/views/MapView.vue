@@ -6,9 +6,10 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import * as geoApi from '@/api/geo';
 import * as landmarkApi from '@/api/landmarks';
+import { planDrive, type DriveStyle } from '@/api/route';
 import { addBaseLayers } from '@/map/tiles';
 import LandmarkForm from '@/components/LandmarkForm.vue';
-import type { LandmarkCreateIn, NearbyHit } from '@/types';
+import type { LandmarkCreateIn, NearbyHit, RecommendHit } from '@/types';
 
 // 默认北京中心
 const DEFAULT_CENTER: [number, number] = [39.908, 116.397];
@@ -54,10 +55,25 @@ const loading = ref(false);
 const selectedCity = ref<string>('');
 const locating = ref(false);
 
+// 工具面板：测距 / 路线 / 推荐
+const tool = ref<'dist' | 'route' | 'recommend'>('dist');
+
 // 距离测量(GEODIST)
 const distA = ref<string>('');
 const distB = ref<string>('');
 const distResult = ref<number | null>(null);
+
+// 路径规划(天地图驾车)
+const routeFrom = ref<string>('');
+const routeTo = ref<string>('');
+const routeStyle = ref<DriveStyle>('0');
+const routePlanning = ref(false);
+const routeInfo = ref<{ distance_km: number; duration_min: number } | null>(null);
+
+// 附近商家推荐
+const recommendCategory = ref<string>('');
+const recommendLoading = ref(false);
+const recommendList = ref<RecommendHit[]>([]);
 
 const dialogOpen = ref(false);
 const submitting = ref(false);
@@ -72,6 +88,7 @@ const formData = reactive<LandmarkCreateIn>({
 
 let map: L.Map | null = null;
 let markerLayer: L.LayerGroup | null = null;
+let routeLayer: L.LayerGroup | null = null;
 
 function fmtDistance(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(2)} km`;
@@ -127,6 +144,72 @@ async function computeDistance() {
   }
   const res = await geoApi.distance(distA.value, distB.value);
   distResult.value = res.distance_km;
+}
+
+function hitById(id: string): NearbyHit | undefined {
+  return hits.value.find((h) => h.id === id);
+}
+
+async function planRoute() {
+  const a = hitById(routeFrom.value);
+  const b = hitById(routeTo.value);
+  if (!a || !b || a.id === b.id) {
+    ElMessage.warning('请选择两个不同的地标作为起点与终点');
+    return;
+  }
+  routePlanning.value = true;
+  try {
+    const plan = await planDrive([a.lng, a.lat], [b.lng, b.lat], routeStyle.value);
+    routeInfo.value = { distance_km: plan.distance_km, duration_min: plan.duration_min };
+    drawRoute(plan.points, [a.lat, a.lng], [b.lat, b.lng]);
+  } catch (e) {
+    ElMessage.error((e as Error).message || '路径规划失败');
+  } finally {
+    routePlanning.value = false;
+  }
+}
+
+function drawRoute(
+  points: [number, number][],
+  start: [number, number],
+  end: [number, number],
+) {
+  if (!map) return;
+  if (!routeLayer) routeLayer = L.layerGroup().addTo(map);
+  routeLayer.clearLayers();
+  const line = L.polyline(points, { color: '#409eff', weight: 5, opacity: 0.8 });
+  L.marker(start).bindPopup('起点').addTo(routeLayer);
+  L.marker(end).bindPopup('终点').addTo(routeLayer);
+  line.addTo(routeLayer);
+  map.fitBounds(line.getBounds(), { padding: [40, 40] });
+}
+
+function clearRoute() {
+  routeLayer?.clearLayers();
+  routeInfo.value = null;
+  routeFrom.value = '';
+  routeTo.value = '';
+}
+
+async function loadRecommend() {
+  if (!map) return;
+  const center = wrappedCenter();
+  recommendLoading.value = true;
+  try {
+    recommendList.value = await geoApi.recommend({
+      lng: center.lng,
+      lat: center.lat,
+      radius_km: Math.min(radiusKm.value, 50),
+      category: recommendCategory.value.trim() || undefined,
+      limit: 10,
+    });
+  } finally {
+    recommendLoading.value = false;
+  }
+}
+
+function focusHit(h: RecommendHit) {
+  map?.setView([h.lat, h.lng], 16);
 }
 
 function flyToCity(name: string) {
@@ -312,20 +395,78 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="dist-bar">
-      <span class="muted">距离测量(GEODIST):</span>
-      <el-select v-model="distA" placeholder="地标 A" size="small" filterable style="width: 160px">
-        <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
-      </el-select>
-      <span class="muted">→</span>
-      <el-select v-model="distB" placeholder="地标 B" size="small" filterable style="width: 160px">
-        <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
-      </el-select>
-      <el-button size="small" @click="computeDistance">计算</el-button>
-      <el-tag v-if="distResult !== null" type="success">{{ distResult.toFixed(3) }} km</el-tag>
+    <div class="tool-bar">
+      <el-radio-group v-model="tool" size="small">
+        <el-radio-button value="dist">测距</el-radio-button>
+        <el-radio-button value="route">路线规划</el-radio-button>
+        <el-radio-button value="recommend">商家推荐</el-radio-button>
+      </el-radio-group>
+
+      <!-- 测距：GEODIST -->
+      <template v-if="tool === 'dist'">
+        <el-select v-model="distA" placeholder="地标 A" size="small" filterable style="width: 150px">
+          <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
+        </el-select>
+        <span class="muted">→</span>
+        <el-select v-model="distB" placeholder="地标 B" size="small" filterable style="width: 150px">
+          <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
+        </el-select>
+        <el-button size="small" @click="computeDistance">计算</el-button>
+        <el-tag v-if="distResult !== null" type="success">{{ distResult.toFixed(3) }} km</el-tag>
+      </template>
+
+      <!-- 路线规划：天地图驾车 -->
+      <template v-else-if="tool === 'route'">
+        <el-select v-model="routeFrom" placeholder="起点" size="small" filterable style="width: 140px">
+          <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
+        </el-select>
+        <span class="muted">→</span>
+        <el-select v-model="routeTo" placeholder="终点" size="small" filterable style="width: 140px">
+          <el-option v-for="h in hits" :key="h.id" :label="h.name" :value="h.id" />
+        </el-select>
+        <el-select v-model="routeStyle" size="small" style="width: 110px">
+          <el-option label="最快路线" value="0" />
+          <el-option label="最短路线" value="1" />
+          <el-option label="避开高速" value="2" />
+        </el-select>
+        <el-button type="primary" size="small" :loading="routePlanning" @click="planRoute">规划</el-button>
+        <el-button size="small" @click="clearRoute">清除</el-button>
+        <el-tag v-if="routeInfo" type="success">
+          {{ routeInfo.distance_km }} km · 约 {{ routeInfo.duration_min }} 分钟
+        </el-tag>
+      </template>
+
+      <!-- 商家推荐 -->
+      <template v-else>
+        <span class="muted">以地图中心 {{ Math.min(radiusKm, 50) }} km 内</span>
+        <el-input v-model="recommendCategory" placeholder="类别(可选)" size="small" clearable style="width: 140px" />
+        <el-button type="primary" size="small" :loading="recommendLoading" @click="loadRecommend">
+          获取推荐
+        </el-button>
+        <span v-if="recommendList.length" class="muted">共 {{ recommendList.length }} 家</span>
+      </template>
     </div>
 
-    <div ref="mapEl" class="map"></div>
+    <div class="map-wrap">
+      <div ref="mapEl" class="map"></div>
+
+      <!-- 推荐结果浮层 -->
+      <div v-if="tool === 'recommend' && recommendList.length" class="recommend-panel card-shadow">
+        <div class="rp-title">推荐 · 距离与热度综合排序</div>
+        <ol class="rp-list">
+          <li v-for="(h, i) in recommendList" :key="h.id" class="rp-item" @click="focusHit(h)">
+            <span class="rp-rank">{{ i + 1 }}</span>
+            <div class="rp-main">
+              <div class="rp-name">{{ h.name }}</div>
+              <div class="rp-meta muted">
+                {{ h.category }} · {{ h.distance_km.toFixed(2) }} km · ♥ {{ h.popularity }}
+              </div>
+            </div>
+            <router-link :to="`/landmarks/${h.id}`" class="rp-link" @click.stop>详情</router-link>
+          </li>
+        </ol>
+      </div>
+    </div>
 
     <el-dialog v-model="dialogOpen" title="创建地标" width="520px">
       <LandmarkForm
@@ -361,7 +502,7 @@ onBeforeUnmount(() => {
   align-items: center;
   flex-wrap: wrap;
 }
-.dist-bar {
+.tool-bar {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -370,9 +511,78 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #ebeef5;
   flex-wrap: wrap;
 }
+.map-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
 .map {
   flex: 1;
   width: 100%;
   min-height: calc(100vh - var(--header-h) - 96px);
+}
+.recommend-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 280px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 8px;
+  z-index: 1000;
+  padding: 12px 0;
+}
+.rp-title {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid #f0f2f5;
+}
+.rp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.rp-item:hover {
+  background: #f5f7fa;
+}
+.rp-rank {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #409eff;
+  color: #fff;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rp-main {
+  flex: 1;
+  min-width: 0;
+}
+.rp-name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rp-meta {
+  font-size: 12px;
+}
+.rp-link {
+  font-size: 12px;
+  color: #409eff;
+  flex-shrink: 0;
 }
 </style>

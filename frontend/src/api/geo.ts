@@ -1,5 +1,5 @@
 import client from './client';
-import type { DistanceOut, NearbyHit } from '@/types';
+import type { DistanceOut, NearbyHit, RecommendHit } from '@/types';
 
 export interface NearbyParams {
   lng: number;
@@ -21,6 +21,17 @@ export const nearby = (params: NearbyParams) =>
 
 export const box = (params: BoxParams) =>
   client.get<NearbyHit[]>('/geo/box', { params }).then((r) => r.data);
+
+export interface RecommendParams {
+  lng: number;
+  lat: number;
+  radius_km?: number;
+  category?: string;
+  limit?: number;
+}
+
+export const recommend = (params: RecommendParams) =>
+  client.get<RecommendHit[]>('/geo/recommend', { params }).then((r) => r.data);
 
 export const distance = (a: string, b: string) =>
   client.get<DistanceOut>('/geo/distance', { params: { a, b } }).then((r) => r.data);

@@ -52,10 +52,28 @@ export interface NearbyHit {
   distance_km: number;
 }
 
+export interface RecommendHit {
+  id: string;
+  name: string;
+  category: string;
+  lng: number;
+  lat: number;
+  distance_km: number;
+  popularity: number;
+  score: number;
+}
+
 export interface DistanceOut {
   a_id: string;
   b_id: string;
   distance_km: number;
+}
+
+export interface RoutePlan {
+  /** [lat, lng] 顺序，便于直接喂给 Leaflet polyline */
+  points: [number, number][];
+  distance_km: number;
+  duration_min: number;
 }
 
 export interface FavoriteState {
