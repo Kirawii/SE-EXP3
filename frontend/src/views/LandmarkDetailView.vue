@@ -6,6 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import * as landmarkApi from '@/api/landmarks';
 import * as geoApi from '@/api/geo';
 import * as socialApi from '@/api/social';
+import { addBaseLayers } from '@/map/tiles';
 import { useAuthStore } from '@/stores/auth';
 import LandmarkForm from '@/components/LandmarkForm.vue';
 import type { Comment, Landmark, LandmarkCreateIn } from '@/types';
@@ -159,10 +160,7 @@ watch(landmark, (lm) => {
   if (!lm || !mapEl.value) return;
   if (!map) {
     map = L.map(mapEl.value).setView([lm.lat, lm.lng], 14);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(map);
+    addBaseLayers(map);
   } else {
     map.setView([lm.lat, lm.lng], 14);
   }

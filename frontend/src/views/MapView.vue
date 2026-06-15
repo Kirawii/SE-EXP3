@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import * as geoApi from '@/api/geo';
 import * as landmarkApi from '@/api/landmarks';
+import { addBaseLayers } from '@/map/tiles';
 import LandmarkForm from '@/components/LandmarkForm.vue';
 import type { LandmarkCreateIn, NearbyHit } from '@/types';
 
@@ -245,10 +246,7 @@ onMounted(() => {
   if (!mapEl.value) return;
   const saved = loadSavedView();
   map = L.map(mapEl.value).setView(saved.center, saved.zoom);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap contributors',
-  }).addTo(map);
+  addBaseLayers(map);
   markerLayer = L.layerGroup().addTo(map);
   map.on('moveend', () => {
     saveView();
