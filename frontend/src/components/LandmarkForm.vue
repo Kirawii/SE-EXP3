@@ -1,33 +1,29 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue';
+import { reactive, ref } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import type { LandmarkCreateIn } from '@/types';
 
+// 单向初始化：组件挂载时从 initial 拷贝一份内部状态，仅在提交时回传，
+// 避免与父组件做双向同步产生回环。父组件用 v-if 控制重新挂载以刷新初值。
 const props = defineProps<{
-  modelValue: LandmarkCreateIn;
+  initial: LandmarkCreateIn;
   loading?: boolean;
   submitText?: string;
 }>();
 
 const emit = defineEmits<{
-  'update:modelValue': [LandmarkCreateIn];
   submit: [LandmarkCreateIn];
 }>();
 
 const formRef = ref<FormInstance>();
-const form = reactive<LandmarkCreateIn>({ ...props.modelValue });
-
-watch(
-  () => props.modelValue,
-  (v) => Object.assign(form, v),
-  { deep: true },
-);
-
-watch(
-  form,
-  (v) => emit('update:modelValue', { ...v }),
-  { deep: true },
-);
+const form = reactive<LandmarkCreateIn>({
+  name: props.initial.name ?? '',
+  category: props.initial.category ?? '',
+  description: props.initial.description ?? '',
+  image_url: props.initial.image_url ?? '',
+  lng: props.initial.lng,
+  lat: props.initial.lat,
+});
 
 const rules: FormRules<LandmarkCreateIn> = {
   name: [

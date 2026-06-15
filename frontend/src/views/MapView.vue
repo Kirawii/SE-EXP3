@@ -239,7 +239,8 @@ onBeforeUnmount(() => {
 
     <el-dialog v-model="dialogOpen" title="创建地标" width="520px">
       <LandmarkForm
-        v-model="formData"
+        v-if="dialogOpen"
+        :initial="formData"
         :loading="submitting"
         submit-text="创建"
         @submit="onCreateSubmit"
