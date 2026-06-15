@@ -9,9 +9,22 @@ import * as landmarkApi from '@/api/landmarks';
 import LandmarkForm from '@/components/LandmarkForm.vue';
 import type { LandmarkCreateIn, NearbyHit } from '@/types';
 
-// 北京中心
+// 默认北京中心
 const DEFAULT_CENTER: [number, number] = [39.908, 116.397];
 const DEFAULT_ZOOM = 11;
+const VIEW_STORAGE_KEY = 'map:last_view';
+
+// 常用城市快选 [纬度, 经度]
+const CITIES: { name: string; center: [number, number] }[] = [
+  { name: '北京', center: [39.908, 116.397] },
+  { name: '上海', center: [31.230, 121.474] },
+  { name: '广州', center: [23.129, 113.264] },
+  { name: '深圳', center: [22.543, 114.058] },
+  { name: '成都', center: [30.572, 104.067] },
+  { name: '西安', center: [34.342, 108.940] },
+  { name: '杭州', center: [30.274, 120.155] },
+  { name: '武汉', center: [30.593, 114.305] },
+];
 
 // leaflet 默认 marker 图标在打包后路径丢失,这里显式指定
 const defaultIcon = L.icon({
@@ -35,6 +48,10 @@ const widthKm = ref(30);
 const heightKm = ref(30);
 const hits = ref<NearbyHit[]>([]);
 const loading = ref(false);
+
+// 位置切换
+const selectedCity = ref<string>('');
+const locating = ref(false);
 
 // 距离测量(GEODIST)
 const distA = ref<string>('');
@@ -111,6 +128,55 @@ async function computeDistance() {
   distResult.value = res.distance_km;
 }
 
+function flyToCity(name: string) {
+  const city = CITIES.find((c) => c.name === name);
+  if (city && map) map.setView(city.center, 12);
+}
+
+function locateMe() {
+  if (!navigator.geolocation) {
+    ElMessage.warning('当前浏览器不支持定位');
+    return;
+  }
+  locating.value = true;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      locating.value = false;
+      selectedCity.value = '';
+      map?.setView([pos.coords.latitude, pos.coords.longitude], 13);
+    },
+    () => {
+      locating.value = false;
+      ElMessage.error('定位失败，请检查浏览器定位权限');
+    },
+    { enableHighAccuracy: true, timeout: 8000 },
+  );
+}
+
+function loadSavedView(): { center: [number, number]; zoom: number } {
+  try {
+    const raw = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (raw) {
+      const v = JSON.parse(raw);
+      if (Array.isArray(v.center) && typeof v.zoom === 'number') {
+        return { center: v.center, zoom: v.zoom };
+      }
+    }
+  } catch {
+    /* 忽略损坏的缓存 */
+  }
+  return { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM };
+}
+
+function saveView() {
+  if (!map) return;
+  const c = wrappedCenter();
+  localStorage.setItem(
+    VIEW_STORAGE_KEY,
+    JSON.stringify({ center: [c.lat, c.lng], zoom: map.getZoom() }),
+  );
+}
+
 function drawMarkers(list: NearbyHit[]) {
   if (!map || !markerLayer) return;
   markerLayer.clearLayers();
@@ -177,13 +243,17 @@ async function onCreateSubmit(payload: LandmarkCreateIn) {
 
 onMounted(() => {
   if (!mapEl.value) return;
-  map = L.map(mapEl.value).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  const saved = loadSavedView();
+  map = L.map(mapEl.value).setView(saved.center, saved.zoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap contributors',
   }).addTo(map);
   markerLayer = L.layerGroup().addTo(map);
-  map.on('moveend', () => void refresh());
+  map.on('moveend', () => {
+    saveView();
+    void refresh();
+  });
   void refresh();
 });
 
@@ -226,6 +296,17 @@ onBeforeUnmount(() => {
         <span class="muted">· 共 {{ hits.length }} 个地标</span>
       </div>
       <div class="right">
+        <el-select
+          v-model="selectedCity"
+          placeholder="切换城市"
+          size="small"
+          clearable
+          style="width: 120px"
+          @change="flyToCity"
+        >
+          <el-option v-for="c in CITIES" :key="c.name" :label="c.name" :value="c.name" />
+        </el-select>
+        <el-button :loading="locating" size="small" @click="locateMe">定位</el-button>
         <el-button :loading="loading" size="small" @click="refresh">刷新</el-button>
         <el-button type="primary" size="small" @click="openCreate">
           在视图中心创建地标
