@@ -59,9 +59,20 @@ function fmtDistance(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(2)} km`;
 }
 
+/**
+ * Leaflet 横向可无限滚动，getCenter().lng 可能超出 ±180；纬度也可能
+ * 漂出 Web Mercator 的 ±85.05 上限。这里把经度环绕归一、纬度夹紧。
+ */
+function wrappedCenter(): { lng: number; lat: number } {
+  if (!map) return { lng: 0, lat: 0 };
+  const c = map.wrapLatLng(map.getCenter());
+  const lat = Math.max(-85.05, Math.min(85.05, c.lat));
+  return { lng: +c.lng.toFixed(6), lat: +lat.toFixed(6) };
+}
+
 async function refresh() {
   if (!map) return;
-  const center = map.getCenter();
+  const center = wrappedCenter();
   loading.value = true;
   try {
     const list =
@@ -138,13 +149,13 @@ function openCreate() {
     return;
   }
   if (!map) return;
-  const c = map.getCenter();
+  const c = wrappedCenter();
   formData.name = '';
   formData.category = '';
   formData.description = '';
   formData.image_url = '';
-  formData.lng = +c.lng.toFixed(6);
-  formData.lat = +c.lat.toFixed(6);
+  formData.lng = c.lng;
+  formData.lat = c.lat;
   dialogOpen.value = true;
 }
 
