@@ -54,12 +54,11 @@ rectangle "地标管理原型系统" {
   }
 
   package "地标管理" {
-    usecase "浏览地标列表" as UC_LIST
+    usecase "浏览/检索地标" as UC_LIST
     usecase "查看地标详情" as UC_DETAIL
     usecase "创建地标"     as UC_CREATE
     usecase "编辑地标"     as UC_EDIT
     usecase "删除地标"     as UC_DELETE
-    usecase "批量导入"     as UC_IMPORT
     usecase "在地图上选点" as UC_PICK
   }
 
@@ -68,6 +67,8 @@ rectangle "地标管理原型系统" {
     usecase "两点距离计算"   as UC_DIST
     usecase "矩形区域查询"   as UC_BOX
     usecase "获取 Geohash"   as UC_HASH
+    usecase "附近商家推荐"   as UC_RECO
+    usecase "驾车路径规划"   as UC_ROUTE
   }
 
   package "互动" {
@@ -83,8 +84,8 @@ rectangle "地标管理原型系统" {
 }
 
 ' ---------- 外部系统 ----------
-actor "Redis GEO"     as Redis  <<外部系统>>
-actor "地图瓦片服务"  as Map    <<外部系统>>
+actor "Redis GEO"  as Redis  <<外部系统>>
+actor "天地图"     as Map    <<外部系统>>
 
 ' ---------- 游客可达 ----------
 Guest --> UC_REG
@@ -94,6 +95,7 @@ Guest --> UC_DETAIL
 Guest --> UC_NEARBY
 Guest --> UC_DIST
 Guest --> UC_BOX
+Guest --> UC_RECO
 
 ' ---------- 注册用户增量 ----------
 User --> UC_LOGOUT
@@ -101,8 +103,8 @@ User --> UC_PROFILE
 User --> UC_CREATE
 User --> UC_EDIT
 User --> UC_DELETE
-User --> UC_IMPORT
 User --> UC_HASH
+User --> UC_ROUTE
 User --> UC_FAV
 User --> UC_COMMENT
 
@@ -122,14 +124,15 @@ UC_REVIEW  ..> UC_DETAIL : <<include>>
 UC_CREATE --> Redis
 UC_EDIT   --> Redis
 UC_DELETE --> Redis
-UC_IMPORT --> Redis
 UC_NEARBY --> Redis
 UC_DIST   --> Redis
 UC_BOX    --> Redis
 UC_HASH   --> Redis
+UC_RECO   --> Redis
 
 UC_LIST   --> Map
 UC_DETAIL --> Map
 UC_PICK   --> Map
+UC_ROUTE  --> Map
 
 @enduml
