@@ -1,0 +1,112 @@
+@startuml
+' 地标管理原型系统 — 领域模型与数据访问层类图
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+hide circle
+
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+class User {
+  +id : str
+  +username : str
+  +email : str
+  -passwordHash : str
+  +role : str
+  +nickname : str
+  +avatar : str
+  +disabled : bool
+  +createdAt : str
+}
+
+class Landmark {
+  +id : str
+  +name : str
+  +category : str
+  +description : str
+  +imageUrl : str
+  +ownerId : str
+  +status : Status
+  +lng : float
+  +lat : float
+  +createdAt : str
+  +updatedAt : str
+}
+
+class Comment {
+  +id : str
+  +landmarkId : str
+  +userId : str
+  +username : str
+  +content : str
+  +createdAt : str
+}
+
+class Favorite {
+  +userId : str
+  +landmarkId : str
+}
+
+User "1" --> "0..*" Landmark : owns(ownerId)
+User "1" --> "0..*" Comment : writes
+Landmark "1" --> "0..*" Comment : has
+User "0..*" -- "0..*" Landmark : favorites
+Landmark --> Status
+
+class UserRepository {
+  +createUser()
+  +getUserById()
+  +getUserByUsername()
+  +updateProfile()
+  +listAllUsers()
+  +setDisabled()
+}
+class LandmarkRepository {
+  +createLandmark()
+  +getLandmark()
+  +updateLandmark()
+  +deleteLandmark()
+  +searchLandmarks()
+  +listByOwner()
+  +listByStatus()
+}
+class SocialRepository {
+  +addFavorite()
+  +removeFavorite()
+  +listFavorites()
+  +addComment()
+  +listComments()
+  +deleteComment()
+}
+class GeoService {
+  +nearby()
+  +box()
+  +recommend()
+  +distance()
+  +geohash()
+}
+class Security {
+  +hashPassword()
+  +verifyPassword()
+  +issueToken()
+  +decodeToken()
+}
+class RedisClient {
+  +redis : Redis
+  +K : KeyNamespace
+}
+
+UserRepository ..> User
+LandmarkRepository ..> Landmark
+SocialRepository ..> Comment
+SocialRepository ..> Favorite
+GeoService ..> LandmarkRepository
+UserRepository ..> RedisClient
+LandmarkRepository ..> RedisClient
+SocialRepository ..> RedisClient
+GeoService ..> RedisClient
+
+@enduml

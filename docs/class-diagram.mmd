@@ -1,0 +1,105 @@
+%%{ init: { "theme": "neutral" } }%%
+classDiagram
+  direction LR
+
+  class User {
+    +str id
+    +str username
+    +str email
+    -str passwordHash
+    +str role
+    +str nickname
+    +str avatar
+    +bool disabled
+    +str createdAt
+  }
+  class Landmark {
+    +str id
+    +str name
+    +str category
+    +str description
+    +str imageUrl
+    +str ownerId
+    +Status status
+    +float lng
+    +float lat
+    +str createdAt
+    +str updatedAt
+  }
+  class Comment {
+    +str id
+    +str landmarkId
+    +str userId
+    +str username
+    +str content
+    +str createdAt
+  }
+  class Favorite {
+    +str userId
+    +str landmarkId
+  }
+  class Status {
+    <<enumeration>>
+    PENDING
+    APPROVED
+    REJECTED
+  }
+
+  User "1" --> "0..*" Landmark : owns(ownerId)
+  User "1" --> "0..*" Comment : writes
+  Landmark "1" --> "0..*" Comment : has
+  User "0..*" -- "0..*" Landmark : favorites
+  Landmark --> Status
+
+  class UserRepository {
+    +createUser()
+    +getUserById()
+    +getUserByUsername()
+    +updateProfile()
+    +listAllUsers()
+    +setDisabled()
+  }
+  class LandmarkRepository {
+    +createLandmark()
+    +getLandmark()
+    +updateLandmark()
+    +deleteLandmark()
+    +searchLandmarks()
+    +listByOwner()
+    +listByStatus()
+  }
+  class SocialRepository {
+    +addFavorite()
+    +removeFavorite()
+    +listFavorites()
+    +addComment()
+    +listComments()
+    +deleteComment()
+  }
+  class GeoService {
+    +nearby()
+    +box()
+    +recommend()
+    +distance()
+    +geohash()
+  }
+  class Security {
+    +hashPassword()
+    +verifyPassword()
+    +issueToken()
+    +decodeToken()
+  }
+  class RedisClient {
+    +Redis redis
+    +K keys
+  }
+
+  UserRepository ..> User : 读写
+  LandmarkRepository ..> Landmark : 读写
+  SocialRepository ..> Comment : 读写
+  SocialRepository ..> Favorite : 读写
+  GeoService ..> LandmarkRepository : 依赖
+  UserRepository ..> RedisClient
+  LandmarkRepository ..> RedisClient
+  SocialRepository ..> RedisClient
+  GeoService ..> RedisClient
